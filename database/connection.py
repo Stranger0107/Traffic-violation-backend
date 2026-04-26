@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://root:0107@Bbs@localhost:3306/traffic_system")
+DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://root:0107%40Bbs@localhost:3306/traffic_system")
 
 # pool_pre_ping keeps the connection alive across long-running requests
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, echo=False)

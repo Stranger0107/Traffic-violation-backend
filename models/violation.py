@@ -46,7 +46,7 @@ FINE_MAP: dict[str, int] = {
 class Violation(Base):
     __tablename__ = "Violations"
 
-    id           = Column(Integer, primary_key=True, index=True)
+    id           = Column("ticket_id", Integer, primary_key=True, index=True)
     frame_no     = Column(Integer, nullable=True)
     plate_number = Column(String(20), nullable=False, index=True)
     violation_type = Column(String(50), nullable=False)          # stores ViolationType value

@@ -22,7 +22,7 @@ class Grievance(Base):
     __tablename__ = "grievances"
 
     id           = Column(Integer, primary_key=True, index=True)
-    violation_id = Column(Integer, ForeignKey("Violations.id"), nullable=False, index=True)
+    violation_id = Column(Integer, ForeignKey("Violations.ticket_id"), nullable=False, index=True)
     plate_number = Column(String(20), nullable=False)
     reason       = Column(Text, nullable=False)
     status       = Column(SAEnum(GrievanceStatus), nullable=False, default=GrievanceStatus.open)

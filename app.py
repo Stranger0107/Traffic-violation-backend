@@ -12,6 +12,7 @@ Interactive docs available at:
 """
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -60,3 +61,8 @@ app.include_router(admin_router)
 def health_check():
     """Simple liveness probe for load-balancers and uptime monitors."""
     return {"status": "ok", "service": "AI e-Challan API"}
+
+@app.get("/", include_in_schema=False)
+def root():
+    """Redirect users to the interactive documentation."""
+    return RedirectResponse(url="/docs")
