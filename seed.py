@@ -1,12 +1,10 @@
 """
 seed.py
 ───────
-One-time script to bootstrap the database with:
-  - A demo admin, officer, and citizen account
-  - The citizen has a sample plate linked to their record
+Bootstrap the database with default demo accounts.
 
-Run once after `uvicorn app:app` has created the tables:
-    python seed.py
+The app startup also calls this helper so the default admin and officer
+accounts are always available in development.
 """
 
 from dotenv import load_dotenv
@@ -18,16 +16,16 @@ from utils.auth import hash_password
 
 Base.metadata.create_all(bind=engine)
 
-SEED_USERS = [
-    {"username": "admin",   "password": "Admin@1234",   "role": UserRole.admin},
-    {"username": "officer1","password": "Officer@1234", "role": UserRole.officer},
-    {"username": "rahul",   "password": "Citizen@1234", "role": UserRole.citizen},
+DEFAULT_USERS = [
+    {"username": "admin",    "password": "Admin@1234",    "role": UserRole.admin},
+    {"username": "officer1", "password": "Officer@1234",  "role": UserRole.officer},
+    {"username": "rahul",    "password": "Citizen@1234",  "role": UserRole.citizen},
 ]
 
-def main():
+def bootstrap_default_users() -> None:
     db = SessionLocal()
     try:
-        for u in SEED_USERS:
+        for u in DEFAULT_USERS:
             if db.query(User).filter(User.username == u["username"]).first():
                 print(f"  [SKIP] User '{u['username']}' already exists")
                 continue
@@ -43,6 +41,10 @@ def main():
         print("\n✅  Seed complete.")
     finally:
         db.close()
+
+
+def main():
+    bootstrap_default_users()
 
 if __name__ == "__main__":
     main()

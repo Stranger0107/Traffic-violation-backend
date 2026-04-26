@@ -18,6 +18,7 @@ from utils.auth import require_admin
 from services.admin_service import (
     get_all_violations,
     get_all_grievances,
+    create_staff_user,
     resolve_grievance,
 )
 
@@ -54,6 +55,13 @@ class ResolveRequest(BaseModel):
     admin_remark: str = ""
 
 
+class CreateStaffRequest(BaseModel):
+    username: str
+    password: str
+    role: str   # "citizen" | "officer" | "admin"
+    plate_number: str | None = None
+
+
 @router.post("/resolve-grievance", summary="Approve or reject a citizen grievance")
 def resolve(
     payload:      ResolveRequest,
@@ -65,3 +73,13 @@ def resolve(
     **reject**  → grievance marked `rejected`, associated challan returns to `issued`.
     """
     return resolve_grievance(db, payload.grievance_id, payload.action, payload.admin_remark)
+
+
+@router.post("/users", summary="Create a staff or citizen account from the admin panel")
+def create_user(
+    payload:      CreateStaffRequest,
+    db:           Session = Depends(get_db),
+    current_user: User    = Depends(require_admin),
+):
+    """Create officer/admin/citizen users from a protected admin-only path."""
+    return create_staff_user(db, payload.username, payload.password, payload.role, payload.plate_number)

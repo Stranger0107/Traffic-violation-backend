@@ -58,6 +58,19 @@ def get_my_challans(db: Session, user: User) -> list[dict]:
     return [format_challan(v, owner_name=user.username) for v in rows]
 
 
+def get_my_grievances(db: Session, user: User) -> list[dict]:
+    """Return all grievances raised by the citizen, newest first."""
+    plate = _get_citizen_plate(db, user)
+
+    rows = (
+        db.query(Grievance)
+        .filter(Grievance.plate_number == plate)
+        .order_by(Grievance.created_at.desc())
+        .all()
+    )
+    return [_format_grievance(g, db) for g in rows]
+
+
 def get_challan_by_id(db: Session, challan_id: int, user: User) -> dict:
     """Return a single challan – citizen can only see their own."""
     plate     = _get_citizen_plate(db, user)
@@ -136,7 +149,11 @@ def get_grievance_by_id(db: Session, grievance_id: int, user: User) -> dict:
 
 # ─── Internal formatter ───────────────────────────────────────────────────────
 
-def _format_grievance(g: Grievance) -> dict:
+def _format_grievance(g: Grievance, db: Session | None = None) -> dict:
+    violation = None
+    if db is not None:
+        violation = db.query(Violation).filter(Violation.id == g.violation_id).first()
+
     return {
         "id":           g.id,
         "violation_id": g.violation_id,
@@ -145,4 +162,12 @@ def _format_grievance(g: Grievance) -> dict:
         "status":       g.status,
         "admin_remark": g.admin_remark,
         "created_at":   g.created_at.strftime("%Y-%m-%dT%H:%M:%SZ") if g.created_at else None,
+        "challan": {
+            "id": violation.id,
+            "plate_number": violation.plate_number,
+            "violation": violation.violation_type,
+            "fine": violation.fine,
+            "status": violation.status,
+            "timestamp": violation.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ") if violation and violation.timestamp else None,
+        } if violation else None,
     }

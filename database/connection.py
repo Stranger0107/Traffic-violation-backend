@@ -13,10 +13,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://root:0107%40Bbs@localhost:3306/traffic_system")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./traffic_system.db")
+
+engine_kwargs = {"pool_pre_ping": True, "echo": False}
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
 
 # pool_pre_ping keeps the connection alive across long-running requests
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, echo=False)
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

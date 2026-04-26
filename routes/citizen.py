@@ -18,6 +18,7 @@ from models.user import User
 from utils.auth import require_citizen
 from services.citizen_service import (
     get_my_challans,
+    get_my_grievances,
     get_challan_by_id,
     submit_grievance,
     get_grievance_by_id,
@@ -35,6 +36,15 @@ def my_challans(
 ):
     """Returns all challans in `issued` status for the citizen's registered plate."""
     return get_my_challans(db, current_user)
+
+
+@router.get("/grievances", summary="View all grievances raised by the logged-in citizen")
+def my_grievances(
+    db:           Session = Depends(get_db),
+    current_user: User    = Depends(require_citizen),
+):
+    """Returns the citizen's grievance history, newest first."""
+    return get_my_grievances(db, current_user)
 
 
 @router.get("/challan/{challan_id}", summary="View a single challan by ID")

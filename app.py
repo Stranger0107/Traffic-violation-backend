@@ -11,6 +11,8 @@ Interactive docs available at:
     http://localhost:8000/redoc   (ReDoc)
 """
 
+import os
+
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,11 +22,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from database.connection import Base, engine
-from routes import auth_router, officer_router, citizen_router, admin_router
+from routes import auth_router, officer_router, citizen_router, admin_router, ml_router
+from seed import bootstrap_default_users
 
 # ── Create all tables (idempotent) ────────────────────────────────────────────
 # In production prefer Alembic migrations; this is fine for development.
 Base.metadata.create_all(bind=engine)
+bootstrap_default_users()
 
 # ── App factory ───────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -41,10 +45,19 @@ app = FastAPI(
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 # Restrict origins in production to your actual frontend domain(s).
+allowed_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = ["*"],
-    allow_credentials = True,
+    allow_origins     = allowed_origins,
+    allow_credentials = False,
     allow_methods     = ["*"],
     allow_headers     = ["*"],
 )
@@ -54,6 +67,7 @@ app.include_router(auth_router)
 app.include_router(officer_router)
 app.include_router(citizen_router)
 app.include_router(admin_router)
+app.include_router(ml_router)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
