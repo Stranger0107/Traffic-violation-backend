@@ -14,9 +14,18 @@ from fastapi import HTTPException
 
 from models.violation import Violation, ViolationStatus, FINE_MAP
 from utils.response import format_challan
+from utils.auth import hash_password, verify_password
+from models.user import User
 
 VIDEO_DIR = os.getenv("VIDEO_UPLOAD_DIR", "uploads/videos")
 
+
+def change_officer_password(db: Session, user: User, old_password: str, new_password: str) -> dict:
+    if not verify_password(old_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+    user.password_hash = hash_password(new_password)
+    db.commit()
+    return {"message": "Password changed successfully"}
 
 # ── Video upload ──────────────────────────────────────────────────────────────
 

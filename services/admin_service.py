@@ -17,6 +17,20 @@ from utils.response import format_challan
 from utils.auth import hash_password
 
 
+def get_all_officers(db: Session) -> list[dict]:
+    rows = db.query(User).filter(User.role == UserRole.officer).all()
+    return [{"id": u.id, "username": u.username, "role": u.role.value} for u in rows]
+
+
+def delete_officer(db: Session, officer_id: int) -> dict:
+    user = db.query(User).filter(User.id == officer_id, User.role == UserRole.officer).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Officer not found")
+    db.delete(user)
+    db.commit()
+    return {"message": "Officer deleted successfully"}
+
+
 def get_all_violations(db: Session) -> list[dict]:
     """Return every violation in the system, newest first."""
     rows = db.query(Violation).order_by(Violation.timestamp.desc()).all()

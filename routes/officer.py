@@ -19,6 +19,7 @@ from services.officer_service import (
     save_video_and_trigger_pipeline,
     get_pending_challans,
     review_challan,
+    change_officer_password,
 )
 
 router = APIRouter(prefix="/officer", tags=["Traffic Officer"])
@@ -72,3 +73,16 @@ def review(
     **reject**  → status changes to `rejected` (AI false-positive, no penalty).
     """
     return review_challan(db, payload.challan_id, payload.action)
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+@router.post("/change-password", summary="Change officer password")
+def change_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_officer)
+):
+    return change_officer_password(db, current_user, payload.old_password, payload.new_password)

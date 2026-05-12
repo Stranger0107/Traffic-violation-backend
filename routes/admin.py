@@ -20,6 +20,8 @@ from services.admin_service import (
     get_all_grievances,
     create_staff_user,
     resolve_grievance,
+    get_all_officers,
+    delete_officer,
 )
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -83,3 +85,13 @@ def create_user(
 ):
     """Create officer/admin/citizen users from a protected admin-only path."""
     return create_staff_user(db, payload.username, payload.password, payload.role, payload.plate_number)
+
+
+@router.get("/officers", summary="Get all officers")
+def get_officers(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    return get_all_officers(db)
+
+
+@router.delete("/officers/{officer_id}", summary="Delete an officer")
+def delete_officer_route(officer_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    return delete_officer(db, officer_id)
