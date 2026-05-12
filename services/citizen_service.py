@@ -168,6 +168,7 @@ def _format_grievance(g: Grievance, db: Session | None = None) -> dict:
             "violation": violation.violation_type,
             "fine": violation.fine,
             "status": violation.status,
+            "evidence_path": violation.evidence_path,
             "timestamp": violation.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ") if violation and violation.timestamp else None,
         } if violation else None,
     }

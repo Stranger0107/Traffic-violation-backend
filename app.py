@@ -16,6 +16,10 @@ import os
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+# Create evidence folder if it doesn't exist
+os.makedirs("evidence", exist_ok=True)
 from dotenv import load_dotenv
 
 # Load .env before anything else
@@ -68,6 +72,9 @@ app.include_router(officer_router)
 app.include_router(citizen_router)
 app.include_router(admin_router)
 app.include_router(ml_router)
+
+# Mount the evidence folder to be accessible via URL
+app.mount("/evidence", StaticFiles(directory="evidence"), name="evidence")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

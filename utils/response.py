@@ -39,6 +39,7 @@ def format_challan(violation: Violation, owner_name: str = "Unknown") -> dict:
         "fine":        violation.fine,
         "status":      violation.status,
         "timestamp":   ts_str,
+        "evidence_path": violation.evidence_path,
     }
 
 
