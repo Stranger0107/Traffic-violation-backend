@@ -11,3 +11,37 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+enum UserRole {
+  CITIZEN
+  TRAFFIC_OFFICER
+  GRIEVANCE_OFFICER
+  ADMIN
+}
+
+enum ViolationType {
+  NO_HELMET
+  NO_SEATBELT
+  RED_LIGHT_JUMP
+  SPEEDING
+  WRONG_SIDE
+  ILLEGAL_PARKING
+  LANE_VIOLATION
+}
+
+enum ViolationStatus {
+  RECEIVED
+  VERIFIED
+  MANUAL_REVIEW
+  REJECTED
+  VEHICLE_NOT_FOUND
+  DUPLICATE_REVIEW
+  CHALLAN_GENERATED
+}
+
+enum ChallanStatus {
+  ISSUED
+  PENDING_PAYMENT
+  PAID
+  CANCELLED
+  CLOSED
+}
