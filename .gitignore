@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime files
+pids/
+*.pid
+*.pid.lock
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Build output
+dist/
+build/
+
+# Uploaded evidence files
+uploads/
+!uploads/.gitkeep
+
+# Prisma local SQLite databases
+prisma/dev.db
+prisma/dev.db-journal
+
+# Python cache / old Python backend files
+__pycache__/
+*.py[cod]
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated ML evidence/images
+evidence/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / editor settings
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.iml
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Test output
+test-results/
+playwright-report/
