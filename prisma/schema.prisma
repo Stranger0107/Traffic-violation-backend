@@ -56,3 +56,47 @@ model User {
 
   vehicles  Vehicle[]
 }
+model Vehicle {
+  id                 String   @id @default(uuid())
+  registrationNumber String   @unique
+  ownerId            String
+  owner              User     @relation(fields: [ownerId], references: [id])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  violations        Violation[]
+  challans          Challan[]
+}
+model Violation {
+  id                  String          @id @default(uuid())
+  modelEventId        String          @unique
+  vehicleId           String?
+  vehicle             Vehicle?        @relation(fields: [vehicleId], references: [id])
+
+  violationType       ViolationType
+  detectedPlate       String
+  normalizedPlate     String
+  ocrConfidence       Float
+  recommendation      String
+  frameNumber         Int?
+  videoTimestampSec   Float?
+  detectedAt          DateTime
+  cameraId            String
+  areaCode            String
+  locationText        String?
+
+  evidenceImageUrl    String
+  plateCropUrl        String?
+
+  duplicateFlag       Boolean         @default(false)
+  duplicateConfidence Float           @default(0)
+  modelVersion        String
+  rawModelPayload     Json
+  status              ViolationStatus @default(RECEIVED)
+
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  evidence            Evidence[]
+  challan             Challan?
+}
