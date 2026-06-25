@@ -9,8 +9,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
+
 enum UserRole {
   CITIZEN
   TRAFFIC_OFFICER
@@ -45,6 +45,7 @@ enum ChallanStatus {
   CANCELLED
   CLOSED
 }
+
 model User {
   id        String   @id @default(uuid())
   fullName  String
@@ -54,8 +55,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  vehicles  Vehicle[]
+  vehicles Vehicle[]
 }
+
 model Vehicle {
   id                 String   @id @default(uuid())
   registrationNumber String   @unique
@@ -64,29 +66,30 @@ model Vehicle {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  violations        Violation[]
-  challans          Challan[]
+  violations Violation[]
+  challans   Challan[]
 }
+
 model Violation {
-  id                  String          @id @default(uuid())
-  modelEventId        String          @unique
-  vehicleId           String?
-  vehicle             Vehicle?        @relation(fields: [vehicleId], references: [id])
+  id           String   @id @default(uuid())
+  modelEventId String   @unique
+  vehicleId    String?
+  vehicle      Vehicle? @relation(fields: [vehicleId], references: [id])
 
-  violationType       ViolationType
-  detectedPlate       String
-  normalizedPlate     String
-  ocrConfidence       Float
-  recommendation      String
-  frameNumber         Int?
-  videoTimestampSec   Float?
-  detectedAt          DateTime
-  cameraId            String
-  areaCode            String
-  locationText        String?
+  violationType     ViolationType
+  detectedPlate     String
+  normalizedPlate   String
+  ocrConfidence     Float
+  recommendation    String
+  frameNumber       Int?
+  videoTimestampSec Float?
+  detectedAt        DateTime
+  cameraId          String
+  areaCode          String
+  locationText      String?
 
-  evidenceImageUrl    String
-  plateCropUrl        String?
+  evidenceImageUrl String
+  plateCropUrl     String?
 
   duplicateFlag       Boolean         @default(false)
   duplicateConfidence Float           @default(0)
@@ -94,12 +97,13 @@ model Violation {
   rawModelPayload     Json
   status              ViolationStatus @default(RECEIVED)
 
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  evidence            Evidence[]
-  challan             Challan?
+  evidence Evidence[]
+  challan  Challan?
 }
+
 model Evidence {
   id          String    @id @default(uuid())
   violationId String
@@ -108,19 +112,20 @@ model Evidence {
   fileType    String
   createdAt   DateTime  @default(now())
 }
+
 model Challan {
-  id            String        @id @default(uuid())
-  challanNumber String        @unique
+  id            String    @id @default(uuid())
+  challanNumber String    @unique
   vehicleId     String
-  vehicle       Vehicle       @relation(fields: [vehicleId], references: [id])
-  violationId   String        @unique
-  violation     Violation     @relation(fields: [violationId], references: [id])
+  vehicle       Vehicle   @relation(fields: [vehicleId], references: [id])
+  violationId   String    @unique
+  violation     Violation @relation(fields: [violationId], references: [id])
 
-  amount        Decimal       @db.Decimal(10, 2)
-  status        ChallanStatus @default(ISSUED)
-  issuedAt      DateTime      @default(now())
-  dueDate       DateTime
+  amount   Decimal       @db.Decimal(10, 2)
+  status   ChallanStatus @default(ISSUED)
+  issuedAt DateTime      @default(now())
+  dueDate  DateTime
 
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
