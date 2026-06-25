@@ -100,3 +100,27 @@ model Violation {
   evidence            Evidence[]
   challan             Challan?
 }
+model Evidence {
+  id          String    @id @default(uuid())
+  violationId String
+  violation   Violation @relation(fields: [violationId], references: [id], onDelete: Cascade)
+  fileUrl     String
+  fileType    String
+  createdAt   DateTime  @default(now())
+}
+model Challan {
+  id            String        @id @default(uuid())
+  challanNumber String        @unique
+  vehicleId     String
+  vehicle       Vehicle       @relation(fields: [vehicleId], references: [id])
+  violationId   String        @unique
+  violation     Violation     @relation(fields: [violationId], references: [id])
+
+  amount        Decimal       @db.Decimal(10, 2)
+  status        ChallanStatus @default(ISSUED)
+  issuedAt      DateTime      @default(now())
+  dueDate       DateTime
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
