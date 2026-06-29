@@ -1,15 +1,12 @@
 const imagekit = require("../config/imagekit");
 
-async function uploadEvidence(fileBuffer, fileName) {
+exports.uploadEvidence = async (file) => {
+
     const response = await imagekit.upload({
-        file: fileBuffer,
-        fileName,
-        folder: "/echallan/evidence",
+        file: file.buffer,
+        fileName: `${Date.now()}-${file.originalname}`,
+        folder: "/echallan/evidence"
     });
 
     return response;
-}
-
-module.exports = {
-    uploadEvidence,
 };
