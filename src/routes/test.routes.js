@@ -1,6 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const { uploadEvidence } = require("../services/storage.service");
+const prisma = require("../config/prisma");
 
 const router = express.Router();
 
@@ -40,5 +41,22 @@ router.post(
         }
     }
 );
+
+router.get("/db", async (req, res) => {
+    try {
+        await prisma.$connect();
+
+        res.json({
+            success: true,
+            message: "Database Connected"
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: err.message
+        });
+    }
+});
 
 module.exports = router;
