@@ -21,10 +21,7 @@ router.post(
                 });
             }
 
-            const result = await uploadEvidence(
-                req.file.buffer,
-                req.file.originalname
-            );
+            const result = await uploadEvidence(req.file);
 
             res.json({
                 success: true,

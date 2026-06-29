@@ -1,51 +1,61 @@
 const prisma = require("../config/prisma");
 
-exports.createViolation = async (metadata) => {
+exports.createViolation = async ({ metadata, uploadResult }) => {
 
-    const violation = await prisma.violation.create({
+    const violation = await prisma.$transaction(async (tx) => {
+        const newViolation = await tx.violation.create({
 
-        data: {
+            data: {
 
-            modelEventId: metadata.modelEventId,
+                modelEventId: metadata.modelEventId,
 
-            violationType: metadata.violationType,
+                violationType: metadata.violationType,
 
-            detectedPlate: metadata.detectedPlate,
+                detectedPlate: metadata.detectedPlate,
 
-            normalizedPlate: metadata.detectedPlate.toUpperCase(),
+                normalizedPlate: metadata.detectedPlate.toUpperCase(),
 
-            ocrConfidence: metadata.ocrConfidence,
+                ocrConfidence: metadata.ocrConfidence,
 
-            recommendation: metadata.recommendation,
+                recommendation: metadata.recommendation,
 
-            frameNumber: metadata.frameNumber,
+                frameNumber: metadata.frameNumber,
 
-            videoTimestampSec: metadata.videoTimestampSec,
+                videoTimestampSec: metadata.videoTimestampSec,
 
-            detectedAt: new Date(metadata.detectedAt),
+                detectedAt: new Date(metadata.detectedAt),
 
-            cameraId: metadata.cameraId,
+                cameraId: metadata.cameraId,
 
-            areaCode: metadata.areaCode,
+                areaCode: metadata.areaCode,
 
-            locationText: metadata.locationText,
+                locationText: metadata.locationText,
 
-            latitude: metadata.latitude,
+                duplicateFlag: metadata.duplicateFlag,
 
-            longitude: metadata.longitude,
+                duplicateConfidence: metadata.duplicateConfidence,
 
-            duplicateFlag: metadata.duplicateFlag,
+                modelVersion: metadata.modelVersion,
 
-            duplicateConfidence: metadata.duplicateConfidence,
+                rawModelPayload: metadata,
 
-            modelVersion: metadata.modelVersion,
+                evidence: {
+                    create: {
+                        imageUrl: uploadResult.url,
+                        imageKitFileId: uploadResult.fileId,
+                        uploadedBy: "ML_MODEL"
+                    }
+                }
 
-            rawModelPayload: metadata
+            },
+            include: {
+                evidence: true
+            }
 
-        }
+        });
 
+        return newViolation;
     });
 
     return violation;
-
 };
