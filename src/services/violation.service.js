@@ -1,8 +1,36 @@
 const prisma = require("../config/prisma");
+const vehicleService = require("./vehicle.service");
+
+const getInitialStatus = ({ vehicle, recommendation }) => {
+    if (!vehicle) {
+        return "VEHICLE_NOT_FOUND";
+    }
+
+    if (recommendation === "AUTO_VERIFY") {
+        return "VERIFIED";
+    }
+
+    if (recommendation === "OFFICER_REVIEW") {
+        return "MANUAL_REVIEW";
+    }
+
+    if (recommendation === "REJECT") {
+        return "REJECTED";
+    }
+
+    return "RECEIVED";
+};
 
 exports.createViolation = async ({ metadata, uploadResult }) => {
 
     const violation = await prisma.$transaction(async (tx) => {
+        const normalizedPlate = vehicleService.normalizePlate(metadata.detectedPlate);
+        const vehicle = await vehicleService.findVehicleByPlate(normalizedPlate, tx);
+        const status = getInitialStatus({
+            vehicle,
+            recommendation: metadata.recommendation
+        });
+
         const newViolation = await tx.violation.create({
 
             data: {
@@ -13,7 +41,9 @@ exports.createViolation = async ({ metadata, uploadResult }) => {
 
                 detectedPlate: metadata.detectedPlate,
 
-                normalizedPlate: metadata.detectedPlate.toUpperCase(),
+                normalizedPlate,
+
+                vehicleId: vehicle?.id,
 
                 ocrConfidence: metadata.ocrConfidence,
 
@@ -38,6 +68,8 @@ exports.createViolation = async ({ metadata, uploadResult }) => {
                 modelVersion: metadata.modelVersion,
 
                 rawModelPayload: metadata,
+
+                status,
 
                 evidence: {
                     create: {
