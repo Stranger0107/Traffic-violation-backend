@@ -1,5 +1,6 @@
 const prisma = require("../config/prisma");
 const vehicleService = require("./vehicle.service");
+const challanService = require("./challan.service");
 
 const getInitialStatus = ({ vehicle, recommendation }) => {
     if (!vehicle) {
@@ -85,6 +86,16 @@ exports.createViolation = async ({ metadata, uploadResult }) => {
             }
 
         });
+
+        if (status === "VERIFIED") {
+            const challan = await challanService.createChallanInternal({
+                violationId: newViolation.id,
+                vehicleId: vehicle.id,
+                violationType: newViolation.violationType
+            }, tx);
+            newViolation.status = "CHALLAN_GENERATED";
+            newViolation.challan = challan;
+        }
 
         return newViolation;
     });
