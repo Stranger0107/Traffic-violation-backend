@@ -64,6 +64,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  grievances Grievance[]
   vehicles Vehicle[]
 }
 
@@ -181,6 +182,48 @@ model Challan {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  grievances Grievance[]
+  
   @@index([vehicleId])
   @@index([status])
+}
+
+enum GrievanceReason {
+  FALSE_DETECTION
+  VEHICLE_NOT_MINE
+  NOT_MYSELF_DRIVING
+  CHALLAN_ALREADY_PAID
+  OTHER
+}
+enum GrievanceStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+model Grievance {
+
+  id          String   @id @default(uuid())
+
+  challanId   String
+  challan     Challan  @relation(fields: [challanId], references: [id])
+
+  citizenId   String
+  citizen     User     @relation(fields: [citizenId], references: [id])
+
+  reason      GrievanceReason
+
+  description String?
+
+  depositAmount Decimal @db.Decimal(10,2)
+
+  depositPaid Boolean @default(false)
+
+  refundIssued Boolean @default(false)
+
+  status      GrievanceStatus @default(PENDING)
+
+  createdAt   DateTime @default(now())
+
+  updatedAt   DateTime @updatedAt
 }
