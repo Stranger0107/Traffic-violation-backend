@@ -21,6 +21,7 @@ enum ViolationType {
   WRONG_SIDE
   ILLEGAL_PARKING
   LANE_VIOLATION
+  MORE_THAN_2_PEOPLE_ON_BIKE
 }
 
 enum Recommendation {

@@ -8,6 +8,7 @@ const FINE_AMOUNTS = {
     WRONG_SIDE: 1500.00,
     ILLEGAL_PARKING: 1000.00,
     LANE_VIOLATION: 500.00,
+    MORE_THAN_2_PEOPLE_ON_BIKE: 800.00,
 };
 
 const generateChallanNumber = () => {

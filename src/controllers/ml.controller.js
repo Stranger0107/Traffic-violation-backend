@@ -11,7 +11,8 @@ const metadataSchema = z.object({
         "SPEEDING",
         "WRONG_SIDE",
         "ILLEGAL_PARKING",
-        "LANE_VIOLATION"
+        "LANE_VIOLATION",
+        "MORE_THAN_2_PEOPLE_ON_BIKE"
     ]),
     detectedPlate: z.string().min(1),
     ocrConfidence: z.number().min(0).max(1),
