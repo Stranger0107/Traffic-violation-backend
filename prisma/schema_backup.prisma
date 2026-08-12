@@ -7,15 +7,14 @@ datasource db {
 }
 
 model User {
-  id         String      @id @default(uuid())
-  fullName   String
-  email      String      @unique
-  password   String
-  role       UserRole    @default(CITIZEN)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  vehicles   Vehicle[]
-  grievances Grievance[]
+  id        String    @id @default(uuid())
+  fullName  String
+  email     String    @unique
+  password  String
+  role      UserRole  @default(CITIZEN)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  vehicles  Vehicle[]
 }
 
 model Vehicle {
@@ -92,9 +91,6 @@ model Challan {
   vehicle       Vehicle       @relation(fields: [vehicleId], references: [id])
   violation     Violation     @relation(fields: [violationId], references: [id])
 
-  grievances Grievance[]
-  refund     Refund?
-
   @@index([vehicleId])
   @@index([status])
 }
@@ -138,85 +134,9 @@ enum ChallanStatus {
   PAID
   CANCELLED
   CLOSED
-  DISPUTED
 }
 
 enum EvidenceSource {
   ML_MODEL
   TRAFFIC_OFFICER
-  CITIZEN
-}
-
-enum GrievanceReason {
-  FALSE_DETECTION
-  VEHICLE_NOT_MINE
-  NOT_MYSELF_DRIVING
-  CHALLAN_ALREADY_PAID
-  OTHER
-}
-
-enum GrievanceStatus {
-  PENDING
-  UNDER_REVIEW
-  APPROVED
-  REJECTED
-}
-
-enum RefundStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-model Grievance {
-  id String @id @default(uuid())
-
-  challanId String
-  challan   Challan @relation(fields: [challanId], references: [id])
-
-  citizenId String
-  citizen   User   @relation(fields: [citizenId], references: [id])
-
-  reason      GrievanceReason
-  description String?
-
-  status GrievanceStatus @default(PENDING)
-
-  reviewedBy  String?
-  reviewedAt  DateTime?
-  officerNote String?
-
-  evidence GrievanceEvidence[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model GrievanceEvidence {
-  id String @id @default(uuid())
-
-  grievanceId String
-  grievance   Grievance @relation(fields: [grievanceId], references: [id], onDelete: Cascade)
-
-  imageUrl       String
-  imageKitFileId String
-  uploadedBy     EvidenceSource @default(TRAFFIC_OFFICER)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Refund {
-  id String @id @default(uuid())
-
-  challanId String  @unique
-  challan   Challan @relation(fields: [challanId], references: [id])
-
-  amount Decimal      @db.Decimal(10, 2)
-  status RefundStatus @default(PENDING)
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  processedAt DateTime?
 }

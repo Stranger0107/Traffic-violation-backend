@@ -107,3 +107,19 @@ exports.createChallan = async (violationId) => {
         }, tx);
     });
 };
+
+/**
+ * Cancel a challan. Uses provided tx if available.
+ */
+exports.cancelChallan = async (challanId, tx) => {
+    const client = tx || prisma;
+    return await client.challan.update({ where: { id: challanId }, data: { status: 'CANCELLED' } });
+};
+
+/**
+ * Mark challan as disputed (uses provided tx if available)
+ */
+exports.markChallanDisputed = async (challanId, tx) => {
+    const client = tx || prisma;
+    return await client.challan.update({ where: { id: challanId }, data: { status: 'DISPUTED' } });
+};
