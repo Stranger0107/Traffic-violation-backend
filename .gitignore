@@ -66,4 +66,6 @@ temp/
 
 # Test output
 test-results/
-playwright-report/
+playwright-report/eng.traineddata
+metadata.json
+test.jpg
