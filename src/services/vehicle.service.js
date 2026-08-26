@@ -7,20 +7,23 @@ exports.normalizePlate = (plate) => {
         .replace(/[^A-Z0-9]/g, "");
 
 };
-const prisma = require("../config/prisma");
+const prisma = require("../config/prisma");exports.findVehicleByPlate = async (plate, tx) => {
 
-exports.findVehicleByPlate = async (plate) => {
-
+    const client = tx || prisma;
     const normalizedPlate = exports.normalizePlate(plate);
 
-    return await prisma.vehicle.findUnique({
+    return await client.vehicle.findUnique({
 
         where: {
+
             registrationNumber: normalizedPlate
+
         },
 
         include: {
+
             owner: true
+
         }
 
     });
