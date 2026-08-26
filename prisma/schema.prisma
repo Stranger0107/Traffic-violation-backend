@@ -117,6 +117,7 @@ enum ViolationType {
   ILLEGAL_PARKING
   LANE_VIOLATION
   MORE_THAN_2_PEOPLE_ON_BIKE
+  MOBILE_PHONE_USAGE
 }
 
 enum Recommendation {

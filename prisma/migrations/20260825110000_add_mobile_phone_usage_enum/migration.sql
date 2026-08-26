@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "ViolationType" ADD VALUE 'MOBILE_PHONE_USAGE';
