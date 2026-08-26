@@ -13,5 +13,6 @@ router.get("/otp-status", authController.otpStatus);
 
 // Protected routes
 router.get("/profile", userAuth, authController.getProfile);
+router.put("/profile", userAuth, authController.updateProfile);
 
 module.exports = router;

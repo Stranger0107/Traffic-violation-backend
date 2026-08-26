@@ -109,7 +109,16 @@ exports.getGrievanceByIdForCitizen = async (id, citizenId) => {
 
 exports.listGrievancesForOfficer = async () => {
     return await prisma.grievance.findMany({
-        include: { challan: { include: { vehicle: { include: { owner: true } } } }, citizen: true },
+        include: {
+            challan: {
+                include: {
+                    vehicle: { include: { owner: true } },
+                    violation: { include: { evidence: true } }
+                }
+            },
+            citizen: true,
+            evidence: true
+        },
         orderBy: { createdAt: 'desc' }
     });
 };
@@ -117,7 +126,16 @@ exports.listGrievancesForOfficer = async () => {
 exports.getGrievanceByIdForOfficer = async (id) => {
     return await prisma.grievance.findUnique({
         where: { id },
-        include: { challan: { include: { vehicle: { include: { owner: true } }, violation: true } }, citizen: true }
+        include: {
+            challan: {
+                include: {
+                    vehicle: { include: { owner: true } },
+                    violation: { include: { evidence: true } }
+                }
+            },
+            citizen: true,
+            evidence: true
+        }
     });
 };
 

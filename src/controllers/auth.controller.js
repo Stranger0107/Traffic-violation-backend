@@ -10,6 +10,7 @@ const registerSchema = z.object({
     email: z.string().email("Invalid email format"),
     password: z.string().min(6, "Password must be at least 6 characters"),
     phone: z.string().min(10, "Phone number must be at least 10 digits"),
+    vehicleNumber: z.string().min(3, "Vehicle number is required").optional(),
 });
 
 // Define login validation schema
@@ -48,7 +49,7 @@ exports.register = async (req, res) => {
             });
         }
 
-        const { fullName, email, password, phone } = validation.data;
+        const { fullName, email, password, phone, vehicleNumber } = validation.data;
         const role = "CITIZEN";
         const normalizedPhone = phone.replace(/\s/g, "").trim();
 
@@ -93,6 +94,7 @@ exports.register = async (req, res) => {
                 password: passwordHash,
                 phone: normalizedPhone,
                 phoneVerified: true,
+                vehicleNumber: vehicleNumber ? vehicleNumber.toUpperCase().replace(/\s/g, "").trim() : null,
                 role
             }
         });
@@ -108,6 +110,8 @@ exports.register = async (req, res) => {
                 id: newUser.id,
                 fullName: newUser.fullName,
                 email: newUser.email,
+                phone: newUser.phone,
+                vehicleNumber: newUser.vehicleNumber,
                 role: newUser.role,
                 createdAt: newUser.createdAt
             }
@@ -247,6 +251,74 @@ exports.login = async (req, res) => {
 };
 
 /**
+ * PUT /api/v1/auth/profile
+ * Update the currently logged in user's profile details.
+ */
+exports.updateProfile = async (req, res) => {
+    try {
+        const allowedFields = ["fullName", "vehicleNumber", "address", "city", "state", "pincode", "licenseNumber"];
+        const updates = {};
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) {
+                updates[field] = req.body[field] ? String(req.body[field]).trim() : null;
+            }
+        }
+
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({ success: false, message: "No valid fields to update" });
+        }
+
+        // Auto-capitalize vehicleNumber and licenseNumber
+        if (updates.vehicleNumber) updates.vehicleNumber = updates.vehicleNumber.toUpperCase().replace(/\s/g, "");
+        if (updates.licenseNumber) updates.licenseNumber = updates.licenseNumber.toUpperCase().replace(/\s/g, "");
+
+        // Check if profile is now complete
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+        const merged = { ...user, ...updates };
+        const profileComplete = !!(
+            merged.fullName &&
+            merged.phone &&
+            merged.vehicleNumber &&
+            merged.address &&
+            merged.city &&
+            merged.state &&
+            merged.pincode &&
+            merged.licenseNumber
+        );
+        updates.profileComplete = profileComplete;
+
+        const updatedUser = await prisma.user.update({
+            where: { id: req.user.id },
+            data: updates,
+        });
+
+        return res.json({
+            success: true,
+            message: profileComplete ? "Profile completed successfully" : "Profile updated",
+            profileComplete,
+            user: {
+                id: updatedUser.id,
+                fullName: updatedUser.fullName,
+                email: updatedUser.email,
+                phone: updatedUser.phone,
+                vehicleNumber: updatedUser.vehicleNumber,
+                address: updatedUser.address,
+                city: updatedUser.city,
+                state: updatedUser.state,
+                pincode: updatedUser.pincode,
+                licenseNumber: updatedUser.licenseNumber,
+                profileComplete: updatedUser.profileComplete,
+                role: updatedUser.role,
+                createdAt: updatedUser.createdAt,
+            },
+        });
+    } catch (err) {
+        console.error("[Profile Update Error]", err.message, err.stack);
+        return res.status(500).json({ success: false, message: "Error updating profile", error: err.message });
+    }
+};
+
+/**
  * Fetches the currently logged in user's profile details.
  */
 exports.getProfile = async (req, res) => {
@@ -268,6 +340,14 @@ exports.getProfile = async (req, res) => {
                 id: user.id,
                 fullName: user.fullName,
                 email: user.email,
+                phone: user.phone,
+                vehicleNumber: user.vehicleNumber,
+                address: user.address,
+                city: user.city,
+                state: user.state,
+                pincode: user.pincode,
+                licenseNumber: user.licenseNumber,
+                profileComplete: user.profileComplete,
                 role: user.role,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt

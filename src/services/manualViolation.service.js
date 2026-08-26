@@ -27,6 +27,27 @@ exports.createManualViolation = async ({ officerId, file, metadata }) => {
             vehicle = await tx.vehicle.findUnique({
                 where: { registrationNumber: normalizedPlate },
             });
+
+            // If vehicle not found, check if a citizen registered this plate
+            if (!vehicle) {
+                const owner = await tx.user.findFirst({
+                    where: {
+                        vehicleNumber: normalizedPlate,
+                        role: "CITIZEN",
+                    },
+                });
+
+                if (owner) {
+                    // Create Vehicle record linked to the citizen
+                    vehicle = await tx.vehicle.create({
+                        data: {
+                            registrationNumber: normalizedPlate,
+                            ownerId: owner.id,
+                        },
+                    });
+                    console.log(`[Manual Violation] Created vehicle ${normalizedPlate} for citizen ${owner.fullName} (${owner.id})`);
+                }
+            }
         }
 
         // 4. Create the violation record — officer-uploaded = AUTO_VERIFY (auto-generates challan)

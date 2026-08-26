@@ -1,5 +1,6 @@
 const manualViolationService = require("../services/manualViolation.service");
 const { z } = require("zod");
+const { createWorker } = require("tesseract.js");
 
 const manualViolationSchema = z.object({
     violationType: z.enum([
@@ -74,6 +75,70 @@ exports.uploadManualViolation = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: err.message,
+        });
+    }
+};
+
+/**
+ * POST /api/v1/officer/detect-plate
+ * Accept an image and auto-detect the license plate number using OCR.
+ */
+exports.detectPlate = async (req, res) => {
+    try {
+        const image = req.files?.image?.[0];
+        if (!image) {
+            return res.status(400).json({
+                success: false,
+                message: "Image file is required",
+            });
+        }
+
+        // Run Tesseract OCR on the uploaded image
+        const worker = await createWorker("eng");
+        const { data: { text, confidence } } = await worker.recognize(image.buffer);
+        await worker.terminate();
+
+        // Clean and extract plate-like text
+        const rawText = text.trim();
+        const cleaned = rawText.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+
+        // Try to find a plate pattern in the OCR output
+        // Indian plates: 2 letters + 1-2 digits + 1-2 letters + 1-4 digits
+        const platePatterns = [
+            /[A-Z]{2}\d{1,2}[A-Z]{1,2}\d{1,4}/,  // Full: MH12AB1234
+            /[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}/,       // Newer: MH12AB1234
+            /[A-Z]{2}\d{1,2}/,                      // Partial: MH12
+        ];
+
+        let detectedPlate = null;
+        let plateConfidence = 0;
+
+        for (const pattern of platePatterns) {
+            const match = cleaned.match(pattern);
+            if (match && match[0].length >= 4) {
+                detectedPlate = match[0];
+                plateConfidence = Math.min(confidence, 100);
+                break;
+            }
+        }
+
+        // If no pattern matched, try the full cleaned text
+        if (!detectedPlate && cleaned.length >= 4 && cleaned.length <= 12) {
+            detectedPlate = cleaned;
+            plateConfidence = Math.min(confidence, 60);
+        }
+
+        return res.json({
+            success: true,
+            detectedPlate: detectedPlate || null,
+            confidence: Math.round(plateConfidence),
+            rawText: rawText.substring(0, 200), // first 200 chars for debugging
+        });
+    } catch (err) {
+        console.error("Plate detection error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to detect plate: " + err.message,
         });
     }
 };

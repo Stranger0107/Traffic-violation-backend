@@ -16,6 +16,15 @@ const upload = multer({
     },
 });
 
+// Traffic officer: detect plate from image
+router.post(
+    "/officer/detect-plate",
+    userAuth,
+    authorize("TRAFFIC_OFFICER"),
+    upload.fields([{ name: "image", maxCount: 1 }]),
+    manualViolationController.detectPlate
+);
+
 // Traffic officer: upload a manual violation
 router.post(
     "/officer/manual-violations",
