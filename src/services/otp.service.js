@@ -90,7 +90,7 @@ async function ensureVerifyService() {
     try {
         console.log("[OTP] No TWILIO_VERIFY_SERVICE_SID found. Auto-provisioning a new Verify service...");
         const service = await client.verify.v2.services.create({
-            friendlyName: "TrafficGuard OTP",
+            friendlyName: "Traffic Mama OTP",
         });
         verifyServiceSid = service.sid;
         console.log(`[OTP] ✅ Verify service created: ${verifyServiceSid}`);
