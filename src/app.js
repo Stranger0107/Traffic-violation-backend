@@ -14,10 +14,24 @@ const paymentRoutes = require("./routes/payment.routes");
 
 const app = express(); 
 
+// Behind a hosting proxy (Render, Railway, etc.) the client IP and protocol
+// arrive in X-Forwarded-* headers; trusting one hop keeps logs and rate signals correct.
+app.set("trust proxy", 1);
+
 app.use(cors());
 app.use(helmet());
 app.use(morgan("dev"));
 app.use(express.json());
+
+// Liveness probe. Deliberately independent of the database so a platform health
+// check reflects "the process is serving" rather than "Postgres is reachable".
+app.get("/api/health", (req, res) => {
+    res.json({
+        status: "ok",
+        service: "traffic-violation-backend",
+        uptimeSeconds: Math.round(process.uptime())
+    });
+});
 
 // Routes
 const testRoutes = require("./routes/test.routes");

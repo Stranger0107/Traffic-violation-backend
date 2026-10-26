@@ -1,0 +1,47 @@
+# Render blueprint for the E-Challan backend.
+#
+# Import the repo in Render → "New +" → "Blueprint" and this file configures the
+# service. Values marked `sync: false` are NOT stored here: Render prompts for
+# them once and keeps them in the dashboard, so no secret is ever committed.
+services:
+  - type: web
+    name: traffic-mama-backend
+    runtime: node
+    plan: free
+    region: singapore
+    branch: restart-backend
+    # prisma is a runtime dependency here, so `npm ci` installs the CLI too;
+    # `prisma generate` also runs from the postinstall script.
+    buildCommand: npm ci && npx prisma generate
+    # Migrations are idempotent: an up-to-date database makes this a no-op.
+    startCommand: npx prisma migrate deploy && node src/server.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Neon / any Postgres. Use the direct (non-pooler) host for migrations.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      # Shared with the detection model, which sends it as x-model-api-key.
+      - key: MODEL_API_KEY
+        sync: false
+      # Evidence images are uploaded to ImageKit, not to local disk.
+      - key: IMAGEKIT_PUBLIC_KEY
+        sync: false
+      - key: IMAGEKIT_PRIVATE_KEY
+        sync: false
+      - key: IMAGEKIT_URL_ENDPOINT
+        sync: false
+      # Demo payment module. Set ENABLED to "false" to make the endpoints answer
+      # 403 DEMO_DISABLED without touching code.
+      - key: DEMO_PAYMENTS_ENABLED
+        value: "true"
+      - key: DEMO_PAYMENT_DEFAULT_OUTCOME
+        value: SUCCESS
+      - key: DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME
+        value: "true"
+      - key: PAYMENT_CONFLICT_RETRY_MS
+        value: "10000"
