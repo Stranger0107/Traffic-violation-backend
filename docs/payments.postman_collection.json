@@ -1,0 +1,426 @@
+{
+  "info": {
+    "_postman_id": "b6b0d4a2-7f4c-4f4f-9c1e-3a5f0d9e1a77",
+    "name": "E-Challan — Demo Payments",
+    "description": "Demo-only e-challan payment flow. No real money moves and no payment credentials are sent or stored.\n\nSetup:\n1. Set `baseUrl` (default http://localhost:5000).\n2. Run Auth → Login (citizen) — the token is stored automatically.\n3. Run Challans → My challans, then set `challanId` to an ISSUED challan id.\n4. Run Payments → Create payment, then a Simulate request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "token", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "challanId", "value": "" },
+    { "key": "paymentId", "value": "" },
+    { "key": "reference", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (citizen)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.token) { pm.collectionVariables.set('token', body.token); }",
+                  "pm.test('login succeeded or credentials need updating', () => pm.expect([200]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"citizen@example.com\",\n  \"password\": \"YourPassword\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "login"] },
+            "description": "Returns { success, token, user }. The token is saved to the collection variable `token`."
+          }
+        },
+        {
+          "name": "Login (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.token) { pm.collectionVariables.set('adminToken', body.token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"YourPassword\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "login"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Challans (prerequisites)",
+      "item": [
+        {
+          "name": "My challans",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/challans/my", "host": ["{{baseUrl}}"], "path": ["api", "v1", "challans", "my"] },
+            "description": "Copy the id of a challan whose status is ISSUED into the `challanId` variable."
+          }
+        },
+        {
+          "name": "Challan by id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/challans/{{challanId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "challans", "{{challanId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Create payment (UPI)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.payment) {",
+                  "  pm.collectionVariables.set('paymentId', body.payment.id);",
+                  "  pm.collectionVariables.set('reference', body.payment.reference);",
+                  "}",
+                  "pm.test('created or reused a pending payment', () => pm.expect([200, 201]).to.include(pm.response.code));",
+                  "pm.test('amount comes from the database', () => pm.expect(body.payment.amount).to.be.a('string'));",
+                  "pm.test('QR is explicitly not scannable', () => pm.expect(body.checkout.scannable).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challanId\": \"{{challanId}}\",\n  \"method\": \"UPI\",\n  \"upiId\": \"demo.user@okhdfc\",\n  \"idempotencyKey\": \"demo-order-001\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api", "v1", "payments"] },
+            "description": "Creates a PENDING demo payment. The amount is read from the challan — never from this body. The dummy UPI id is only echoed back masked; it is not stored."
+          }
+        },
+        {
+          "name": "Create payment (credit card)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.payment) { pm.collectionVariables.set('paymentId', body.payment.id); }",
+                  "pm.test('card checkout is demo-only', () => pm.expect(body.checkout.card.credentialsStored).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challanId\": \"{{challanId}}\",\n  \"method\": \"CREDIT_CARD\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api", "v1", "payments"] },
+            "description": "Only the method is sent — never a card number, CVV or expiry. Those keys are rejected by the API."
+          }
+        },
+        {
+          "name": "Create payment (debit card)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challanId\": \"{{challanId}}\",\n  \"method\": \"DEBIT_CARD\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api", "v1", "payments"] }
+          }
+        },
+        {
+          "name": "Simulate → SUCCESS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('status 200', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('payment succeeded', () => pm.expect(body.payment.status).to.eql('SUCCESS'));",
+                  "pm.test('receipt labels the demo', () => pm.expect(body.receipt.demoLabel).to.eql('DEMO — NO REAL MONEY TRANSFERRED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"outcome\": \"SUCCESS\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/simulate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "{{paymentId}}", "simulate"]
+            },
+            "description": "Server-controlled demo transaction. The client only requests an outcome; the server decides and records it, and only the server may mark the challan PAID."
+          }
+        },
+        {
+          "name": "Simulate → FAILED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('payment failed', () => pm.expect(body.payment.status).to.eql('FAILED'));",
+                  "pm.test('no receipt for a failed payment', () => pm.expect(body.receipt).to.eql(null));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"outcome\": \"FAILED\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/simulate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "{{paymentId}}", "simulate"]
+            }
+          }
+        },
+        {
+          "name": "Simulate → PENDING",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"outcome\": \"PENDING\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/simulate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "{{paymentId}}", "simulate"]
+            }
+          }
+        },
+        {
+          "name": "Simulate with server default outcome",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/simulate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "{{paymentId}}", "simulate"]
+            },
+            "description": "No outcome sent — DEMO_PAYMENT_DEFAULT_OUTCOME is applied (outcomeSource = server-config)."
+          }
+        },
+        {
+          "name": "Get payment by id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "{{paymentId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get payment by reference",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/reference/{{reference}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "reference", "{{reference}}"]
+            }
+          }
+        },
+        {
+          "name": "My payment history",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/my?status=SUCCESS&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "my"],
+              "query": [
+                { "key": "status", "value": "SUCCESS" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Receipt (409 before success)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('receipt gated on SUCCESS', () => {",
+                  "  if (pm.response.code === 200) { pm.expect(body.receipt.status).to.eql('SUCCESS'); }",
+                  "  else { pm.expect(pm.response.code).to.eql(409); pm.expect(body.code).to.eql('RECEIPT_NOT_AVAILABLE'); }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/receipt",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "{{paymentId}}", "receipt"]
+            },
+            "description": "Only successful payments produce a receipt; pending/failed ones return 409 RECEIPT_NOT_AVAILABLE."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Negative cases",
+      "item": [
+        {
+          "name": "Pay someone else's challan (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challanId\": \"00000000-0000-4000-8000-000000000000\",\n  \"method\": \"UPI\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api", "v1", "payments"] },
+            "description": "Unknown challan → 404 CHALLAN_NOT_FOUND; a challan owned by someone else → 403 FORBIDDEN."
+          }
+        },
+        {
+          "name": "Invalid payment method (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challanId\": \"{{challanId}}\",\n  \"method\": \"BITCOIN\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api", "v1", "payments"] }
+          }
+        },
+        {
+          "name": "Send card credentials (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challanId\": \"{{challanId}}\",\n  \"method\": \"CREDIT_CARD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cvv\": \"123\",\n  \"expiry\": \"12/30\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api", "v1", "payments"] },
+            "description": "Rejected by the strict schema — credentials are never accepted, so they can never be stored or logged."
+          }
+        },
+        {
+          "name": "Simulate without a token (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"outcome\": \"SUCCESS\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/simulate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "{{paymentId}}", "simulate"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "All payments",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/payments?status=SUCCESS",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "payments"],
+              "query": [{ "key": "status", "value": "SUCCESS" }]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

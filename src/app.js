@@ -9,6 +9,7 @@ const challanRoutes = require("./routes/challan.routes");
 const violationRoutes = require("./routes/violation.routes");
 const adminRoutes = require("./routes/admin.routes");
 const officerRoutes = require("./routes/officer.routes");
+const paymentRoutes = require("./routes/payment.routes");
 
 
 const app = express(); 
@@ -29,5 +30,6 @@ app.use("/api/v1", challanRoutes);
 app.use("/api/v1", violationRoutes);
 app.use("/api/v1", adminRoutes);
 app.use("/api/v1", officerRoutes);
+app.use("/api/v1", paymentRoutes);
 
 module.exports = app;

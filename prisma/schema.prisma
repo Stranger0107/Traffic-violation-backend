@@ -25,6 +25,7 @@ model User {
   updatedAt       DateTime    @updatedAt
   vehicles        Vehicle[]
   grievances      Grievance[]
+  payments        Payment[]
 }
 
 model Vehicle {
@@ -103,6 +104,7 @@ model Challan {
 
   grievances Grievance[]
   refund     Refund?
+  payments   Payment[]
 
   @@index([vehicleId])
   @@index([status])
@@ -178,6 +180,46 @@ enum RefundStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+enum PaymentMethod {
+  UPI
+  CREDIT_CARD
+  DEBIT_CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+// Demo-only payment record. No real money moves; no payment credentials are stored.
+model Payment {
+  id          String        @id @default(uuid())
+  reference   String        @unique // demo transaction reference, e.g. DEMO-PAY-2026-XXXXXXXX
+  challanId   String
+  citizenId   String
+  amount      Decimal       @db.Decimal(10, 2) // snapshot of challan.fineAmount at creation time
+  currency    String        @default("INR")
+  method      PaymentMethod
+  status      PaymentStatus @default(PENDING)
+  isDemo      Boolean       @default(true)
+  // Client-supplied idempotency key; unique per citizen so a retried request reuses the row.
+  idempotencyKey String?
+  failureReason  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  completedAt DateTime?
+
+  challan Challan @relation(fields: [challanId], references: [id])
+  citizen User    @relation(fields: [citizenId], references: [id])
+
+  @@unique([citizenId, idempotencyKey])
+  @@index([challanId])
+  @@index([citizenId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Grievance {
