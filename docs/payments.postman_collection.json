@@ -163,6 +163,18 @@
         },
         {
           "name": "Create payment (debit card)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.payment) { pm.collectionVariables.set('paymentId', body.payment.id); }"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -343,7 +355,7 @@
       "name": "Negative cases",
       "item": [
         {
-          "name": "Pay someone else's challan (403)",
+          "name": "Unknown challan (404)",
           "request": {
             "method": "POST",
             "header": [
@@ -355,7 +367,7 @@
               "raw": "{\n  \"challanId\": \"00000000-0000-4000-8000-000000000000\",\n  \"method\": \"UPI\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/api/v1/payments", "host": ["{{baseUrl}}"], "path": ["api", "v1", "payments"] },
-            "description": "Unknown challan → 404 CHALLAN_NOT_FOUND; a challan owned by someone else → 403 FORBIDDEN."
+            "description": "All-zero UUID → 404 CHALLAN_NOT_FOUND. For the ownership case, log in as a second citizen and use the first citizen's `challanId`: create returns 403 FORBIDDEN, and reading/simulating that payment returns 403 too."
           }
         },
         {

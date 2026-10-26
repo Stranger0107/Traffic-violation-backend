@@ -122,6 +122,10 @@ const simulate = (token, paymentId, outcome) =>
 
 test.before(async () => {
     assert.ok(process.env.JWT_SECRET, "JWT_SECRET must be set to run payment tests");
+    // The module is opt-in; tests exercise the enabled configuration explicitly
+    // (test 14 covers the fail-closed behaviour when these are absent).
+    process.env.DEMO_PAYMENTS_ENABLED = "true";
+    process.env.DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME = "true";
     server = app.listen(0);
     await new Promise((resolve) => server.once("listening", resolve));
     baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -563,6 +567,12 @@ test("12. payment credentials are rejected and never stored", async () => {
         }
     });
     assert.equal(withCard.status, 400, "cards/CVV/expiry/UPI PIN must be rejected, not accepted");
+    // The rejection names the offending keys (names only, never values) so the cause is obvious.
+    const rejection = JSON.stringify(withCard.body);
+    for (const key of ["cardNumber", "cvv", "expiry", "upiPin"]) {
+        assert.ok(rejection.includes(key), `rejection should name ${key}: ${rejection}`);
+    }
+    assert.ok(!rejection.includes("4111111111111111"), "the card value itself must not be echoed");
 
     const created = await createPayment(token, challan.id, { method: "UPI" });
     assert.equal(created.status, 201);
@@ -633,3 +643,252 @@ test("13. a failure inside the simulation transaction rolls back completely", as
     assert.equal(retry.status, 200);
     assert.equal(retry.body.payment.status, "SUCCESS");
 });
+
+// ── 14. fail-closed defaults (opt-in demo mode) ───────────────────────────
+
+test("14. with the demo flags unset, create and simulate fail closed", async () => {
+    const citizen = await makeUser("CITIZEN", "fail-closed");
+    const token = tokenFor(citizen);
+    const challan = await makePayableChallanFor(citizen);
+    const payment = await createPayment(token, challan.id);
+    assert.equal(payment.status, 201);
+
+    const enabled = process.env.DEMO_PAYMENTS_ENABLED;
+    const allowClient = process.env.DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME;
+    delete process.env.DEMO_PAYMENTS_ENABLED;
+    delete process.env.DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME;
+    try {
+        const createAttempt = await createPayment(token, (await makePayableChallanFor(citizen)).id);
+        assert.equal(createAttempt.status, 403);
+        assert.equal(createAttempt.body.code, "DEMO_DISABLED");
+
+        const simAttempt = await simulate(token, payment.body.payment.id, "SUCCESS");
+        assert.equal(simAttempt.status, 403);
+        assert.equal(simAttempt.body.code, "DEMO_DISABLED");
+    } finally {
+        process.env.DEMO_PAYMENTS_ENABLED = enabled;
+        process.env.DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME = allowClient;
+    }
+
+    const dbPayment = await prisma.payment.findUnique({ where: { id: payment.body.payment.id } });
+    assert.equal(dbPayment.status, "PENDING");
+    // ...and the module works again once enabled.
+    const nowWorks = await simulate(token, payment.body.payment.id, "SUCCESS");
+    assert.equal(nowWorks.status, 200);
+});
+
+test("14b. without explicit client-outcome permission the server outcome wins", async () => {
+    const citizen = await makeUser("CITIZEN", "server-outcome");
+    const token = tokenFor(citizen);
+    const challan = await makePayableChallanFor(citizen);
+    const payment = await createPayment(token, challan.id);
+
+    const previous = process.env.DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME;
+    process.env.DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME = "false";
+    try {
+        // Client asks for FAILED, server default is SUCCESS.
+        const res = await simulate(token, payment.body.payment.id, "FAILED");
+        assert.equal(res.status, 200);
+        assert.equal(res.body.outcomeSource, "server-config");
+        assert.equal(res.body.payment.status, "SUCCESS");
+    } finally {
+        process.env.DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME = previous;
+    }
+});
+
+// ── 15. challan state gating ──────────────────────────────────────────────
+
+test("15. only payable challan statuses can be paid", async () => {
+    const citizen = await makeUser("CITIZEN", "status-gate");
+    const token = tokenFor(citizen);
+    const vehicle = await makeVehicle(citizen.id);
+
+    for (const status of ["CANCELLED", "DISPUTED", "CLOSED"]) {
+        const challan = await makeChallan(vehicle.id, { status });
+        const res = await createPayment(token, challan.id);
+        assert.equal(res.status, 409, `${status} must not be payable`);
+        assert.equal(res.body.code, "CHALLAN_NOT_PAYABLE");
+    }
+
+    const payable = await makeChallan(vehicle.id, { status: "PENDING_PAYMENT" });
+    const ok = await createPayment(token, payable.id);
+    assert.equal(ok.status, 201);
+});
+
+// ── 16. route/schema hardening ────────────────────────────────────────────
+
+test("16. malformed ids, unknown payments and bad bodies are rejected", async () => {
+    const citizen = await makeUser("CITIZEN", "hardening");
+    const token = tokenFor(citizen);
+    const challan = await makePayableChallanFor(citizen);
+    const payment = await createPayment(token, challan.id);
+
+    const unknown = await simulate(token, crypto.randomUUID(), "SUCCESS");
+    assert.equal(unknown.status, 404);
+    assert.equal(unknown.body.code, "PAYMENT_NOT_FOUND");
+
+    const malformed = await simulate(token, "not-a-uuid", "SUCCESS");
+    assert.equal(malformed.status, 400);
+
+    const badOutcome = await simulate(token, payment.body.payment.id, "PAID");
+    assert.equal(badOutcome.status, 400);
+
+    // An arbitrary success-ish flag must not be accepted as an outcome.
+    const successFlag = await api(`/api/v1/payments/${payment.body.payment.id}/simulate`, {
+        method: "POST",
+        token,
+        body: { success: true }
+    });
+    assert.equal(successFlag.status, 400);
+
+    const upiOnCard = await createPayment(token, challan.id, { method: "CREDIT_CARD", upiId: "x@y" });
+    assert.equal(upiOnCard.status, 400);
+});
+
+// ── 17. every read path is ownership checked ──────────────────────────────
+
+test("17. cross-citizen reads are refused on every route", async () => {
+    const owner = await makeUser("CITIZEN", "read-owner");
+    const intruder = await makeUser("CITIZEN", "read-intruder");
+    const admin = await makeUser("ADMIN", "read-admin");
+    const challan = await makePayableChallanFor(owner);
+    const payment = await createPayment(tokenFor(owner), challan.id);
+    const { id, reference } = payment.body.payment;
+
+    for (const path of [
+        `/api/v1/payments/${id}`,
+        `/api/v1/payments/reference/${reference}`,
+        `/api/v1/payments/${id}/receipt`
+    ]) {
+        const res = await api(path, { token: tokenFor(intruder) });
+        assert.equal(res.status, 403, `${path} leaked data or wrong status`);
+    }
+
+    // Admin is allowed to read; owner obviously is.
+    assert.equal((await api(`/api/v1/payments/${id}`, { token: tokenFor(admin) })).status, 200);
+    assert.equal((await api(`/api/v1/payments/reference/${reference}`, { token: tokenFor(owner) })).status, 200);
+});
+
+test("17b. an admin may operate another citizen's demo payment", async () => {
+    const citizen = await makeUser("CITIZEN", "admin-sim");
+    const admin = await makeUser("ADMIN", "admin-sim-operator");
+    const challan = await makePayableChallanFor(citizen);
+    const payment = await createPayment(tokenFor(citizen), challan.id);
+
+    const res = await simulate(tokenFor(admin), payment.body.payment.id, "SUCCESS");
+    assert.equal(res.status, 200);
+    assert.equal(res.body.payment.status, "SUCCESS");
+
+    const dbChallan = await prisma.challan.findUnique({ where: { id: challan.id } });
+    assert.equal(dbChallan.status, "PAID");
+});
+
+// ── 18. retry semantics of pending and failed payments ────────────────────
+
+test("18. pending settles later; failed is terminal but recoverable with a new payment", async () => {
+    const citizen = await makeUser("CITIZEN", "retry-semantics");
+    const token = tokenFor(citizen);
+
+    // PENDING -> still settleable afterwards.
+    const pendingChallan = await makePayableChallanFor(citizen);
+    const pending = await createPayment(token, pendingChallan.id);
+    const stillPending = await simulate(token, pending.body.payment.id, "PENDING");
+    assert.equal(stillPending.body.payment.status, "PENDING");
+    assert.equal(
+        (await prisma.challan.findUnique({ where: { id: pendingChallan.id } })).status,
+        "ISSUED"
+    );
+    const settled = await simulate(token, pending.body.payment.id, "SUCCESS");
+    assert.equal(settled.body.payment.status, "SUCCESS");
+
+    // FAILED -> replaying never resurrects or settles it.
+    const failedChallan = await makePayableChallanFor(citizen);
+    const failedPayment = await createPayment(token, failedChallan.id);
+    await simulate(token, failedPayment.body.payment.id, "FAILED");
+
+    const replay = await simulate(token, failedPayment.body.payment.id, "SUCCESS");
+    assert.equal(replay.status, 200);
+    assert.equal(replay.body.idempotent, true);
+    assert.equal(replay.body.payment.status, "FAILED");
+    assert.equal(replay.body.receipt, null);
+    assert.equal(
+        (await prisma.challan.findUnique({ where: { id: failedChallan.id } })).status,
+        "ISSUED",
+        "a failed payment must not settle the challan"
+    );
+
+    // A fresh payment on the same challan is allowed and can succeed.
+    const second = await createPayment(token, failedChallan.id);
+    assert.equal(second.status, 201);
+    assert.notEqual(second.body.payment.id, failedPayment.body.payment.id);
+    const success = await simulate(token, second.body.payment.id, "SUCCESS");
+    assert.equal(success.body.payment.status, "SUCCESS");
+});
+
+// ── 19. amount snapshot is immutable ──────────────────────────────────────
+
+test("19. the stored amount is a snapshot and ignores later fine changes", async () => {
+    const citizen = await makeUser("CITIZEN", "snapshot");
+    const token = tokenFor(citizen);
+    const challan = await makePayableChallanFor(citizen);
+    const payment = await createPayment(token, challan.id);
+    assert.equal(payment.body.payment.amount, "500.00");
+
+    await prisma.challan.update({ where: { id: challan.id }, data: { fineAmount: 9999 } });
+
+    const reread = await api(`/api/v1/payments/${payment.body.payment.id}`, { token });
+    assert.equal(reread.body.payment.amount, "500.00");
+
+    const settled = await simulate(token, payment.body.payment.id, "SUCCESS");
+    assert.equal(settled.body.receipt.amount, "500.00");
+});
+
+// ── 20. idempotency key collision across methods ──────────────────────────
+
+test("20. reusing an idempotency key with another method is a conflict", async () => {
+    const citizen = await makeUser("CITIZEN", "key-collision");
+    const token = tokenFor(citizen);
+    const challan = await makePayableChallanFor(citizen);
+    const key = `key-${uniq()}-${uniq()}`;
+
+    const first = await createPayment(token, challan.id, { idempotencyKey: key });
+    assert.equal(first.status, 201);
+
+    const otherMethod = await createPayment(token, challan.id, {
+        idempotencyKey: key,
+        method: "DEBIT_CARD"
+    });
+    assert.equal(otherMethod.status, 409);
+    assert.equal(otherMethod.body.code, "IDEMPOTENCY_MISMATCH");
+    assert.equal(await prisma.payment.count({ where: { challanId: challan.id } }), 1);
+});
+
+// ── 21. a sibling pending payment can never double-pay ────────────────────
+
+test("21. a pending sibling of a settled payment cannot pay the challan again", async () => {
+    const citizen = await makeUser("CITIZEN", "sibling");
+    const token = tokenFor(citizen);
+    const challan = await makePayableChallanFor(citizen);
+
+    const upi = await createPayment(token, challan.id, { method: "UPI" });
+    const debit = await createPayment(token, challan.id, { method: "DEBIT_CARD" });
+    await simulate(token, upi.body.payment.id, "SUCCESS");
+
+    // The sibling was left PENDING; settling it must be refused, not applied.
+    const attempt = await simulate(token, debit.body.payment.id, "SUCCESS");
+    assert.equal(attempt.status, 409);
+    assert.equal(attempt.body.code, "ALREADY_PAID");
+    assert.equal(attempt.body.payment.status, "FAILED");
+
+    assert.equal(
+        await prisma.payment.count({ where: { challanId: challan.id, status: "SUCCESS" } }),
+        1
+    );
+    const dbChallan = await prisma.challan.findUnique({ where: { id: challan.id } });
+    assert.equal(dbChallan.status, "PAID");
+
+    // Its receipt stays unavailable.
+    const receipt = await api(`/api/v1/payments/${debit.body.payment.id}/receipt`, { token });
+    assert.equal(receipt.status, 409);
+});
+

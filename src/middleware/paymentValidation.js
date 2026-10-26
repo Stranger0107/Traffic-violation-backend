@@ -64,11 +64,15 @@ const listQuerySchema = z.object({
 });
 
 const respond = (res, result) => {
-    const errors = result.error.flatten().fieldErrors;
+    const flat = result.error.flatten();
     return res.status(400).json({
         success: false,
         message: "Invalid payment request",
-        errors
+        errors: flat.fieldErrors,
+        // Unrecognized keys surface here as key *names* only (e.g. "cardNumber"), so a
+        // caller sending credentials sees why it was rejected without the value ever
+        // being echoed back into a response or a log.
+        ...(flat.formErrors.length ? { formErrors: flat.formErrors } : {})
     });
 };
 

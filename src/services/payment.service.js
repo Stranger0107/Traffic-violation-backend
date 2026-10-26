@@ -41,17 +41,18 @@ class PaymentError extends Error {
 
 // ── demo mode / outcome policy ────────────────────────────────────────────
 
-const demoPaymentsEnabled = () => process.env.DEMO_PAYMENTS_ENABLED !== "false";
+/**
+ * Demo payments are opt-in: the flag must be exactly "true".
+ * A deployment that forgets to configure it therefore fails closed (403 DEMO_DISABLED)
+ * instead of exposing a way to settle challans without payment.
+ */
+const demoPaymentsEnabled = () => process.env.DEMO_PAYMENTS_ENABLED === "true";
 
 /**
  * Whether a client-supplied demo outcome may be honored.
- * Explicit env flag wins; otherwise it is enabled outside production only.
+ * Also opt-in ("true" only), so an unconfigured server applies its own outcome.
  */
-const clientOutcomeAllowed = () => {
-    if (process.env.DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME === "true") return true;
-    if (process.env.DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME === "false") return false;
-    return process.env.NODE_ENV !== "production";
-};
+const clientOutcomeAllowed = () => process.env.DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME === "true";
 
 const normalizeOutcome = (value) => {
     if (!value) return null;

@@ -161,8 +161,9 @@ Content-Type: application/json
 ```
 
 Body may be empty (`{}`) — the server then applies its configured default. `outcome` is a
-**request**, not an assertion: it is honored only while demo payments are enabled and
-`DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME` permits it (default: allowed outside `NODE_ENV=production`).
+**request**, not an assertion: it is honored only when `DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME=true`.
+That flag and `DEMO_PAYMENTS_ENABLED` are **opt-in** (only the literal value `true` enables them),
+so an unconfigured server answers `403 DEMO_DISABLED` instead of silently allowing free settlements.
 The status written to the database is always the server's decision, returned as `outcomeSource`.
 
 `200 OK` (success):
@@ -222,7 +223,7 @@ Receipt before success:
 
 | HTTP | `code` | Meaning |
 |---|---|---|
-| 400 | — (`errors` map) | Validation failure (bad UUID, unknown method, unexpected keys) |
+| 400 | — (`errors` / `formErrors`) | Validation failure (bad UUID, unknown method). Rejected extra keys such as `cardNumber`/`cvv` are listed by **name** only under `formErrors` |
 | 401 | — | Missing/invalid JWT |
 | 403 | `FORBIDDEN` | Not your challan/payment, or wrong role |
 | 403 | `DEMO_DISABLED` | Demo payment simulation turned off |
@@ -279,18 +280,21 @@ Guarantees enforced in code and in the database:
 | Client can't declare success | `outcome` is only a request. The server decides, records `outcomeSource`, and holds the only code path that writes `Challan.status = PAID`. |
 | No unrestricted "mark paid" endpoint | Only `/payments/:id/simulate` on a specific pending payment of your own challan; role-limited to CITIZEN/ADMIN; disabled entirely by `DEMO_PAYMENTS_ENABLED=false`. |
 | Ownership | Derived from `challan.vehicle.ownerId` / `payment.citizenId` server-side — never from a client-supplied user id. |
-| Demo disabled in production | `DEMO_PAYMENTS_ENABLED=false` disables creation *and* simulation. `DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME` defaults to `false` when `NODE_ENV=production`, so only the server-configured outcome applies. |
+| Demo is opt-in per environment | `DEMO_PAYMENTS_ENABLED` and `DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME` only activate on the exact value `true`. With the variables absent, create and simulate return `403 DEMO_DISABLED` — a forgotten config fails closed instead of letting citizens settle challans for free. |
 | No fake claims of real transfer | Every payment/receipt/checkout carries `isDemo: true` and/or `demoLabel: "DEMO — NO REAL MONEY TRANSFERRED"`; `checkout.scannable: false`. |
 
 ### Environment variables
 
 ```env
-# Demo payment module
-DEMO_PAYMENTS_ENABLED=true                 # false disables create + simulate entirely
-DEMO_PAYMENT_DEFAULT_OUTCOME=SUCCESS        # SUCCESS | FAILED | PENDING (used when the client sends nothing)
-DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME=true      # defaults to (NODE_ENV !== 'production')
+# Demo payment module — opt-in; absent/anything-else => 403 DEMO_DISABLED
+DEMO_PAYMENTS_ENABLED=true                  # must be exactly "true" to allow create + simulate
+DEMO_PAYMENT_DEFAULT_OUTCOME=SUCCESS         # SUCCESS | FAILED | PENDING (used when the client sends nothing)
+DEMO_PAYMENT_ALLOW_CLIENT_OUTCOME=true       # must be exactly "true" to let the client pick an outcome
 PAYMENT_CONFLICT_RETRY_MS=10000              # serialization-retry budget in ms
 ```
+
+Enabling the module is therefore a deliberate act in every environment. The local development
+`.env` ships these three flags; a server without them refuses payments until they are added.
 
 See [`.env.example`](../.env.example). No secrets are required — this module contacts no gateway.
 
@@ -322,8 +326,16 @@ npm run test:payments    # payment module only
 | 11 | Unauthorized simulation | `11.` (anonymous 401, foreign 403, wrong role 403, demo disabled 403), `11b.`, `11c.` |
 | 12 | Credentials not stored | `12. payment credentials are rejected and never stored` |
 | 13 | DB consistency on failure | `13. a failure inside the simulation transaction rolls back completely` |
+| 14 | Fail-closed defaults | `14. with the demo flags unset, create and simulate fail closed`, `14b.` |
+| 15 | Non-payable challan states | `15. only payable challan statuses can be paid` |
+| 16 | Malformed ids / unknown payment / bad bodies | `16. malformed ids, unknown payments and bad bodies are rejected` |
+| 17 | Cross-citizen reads on every route, admin access | `17.`, `17b.` |
+| 18 | Pending settles later, failed is terminal | `18. pending settles later; failed is terminal but recoverable with a new payment` |
+| 19 | Amount snapshot immutability | `19. the stored amount is a snapshot and ignores later fine changes` |
+| 20 | Idempotency key reuse across methods | `20. reusing an idempotency key with another method is a conflict` |
+| 21 | Sibling pending payment cannot double-pay | `21. a pending sibling of a settled payment cannot pay the challan again` |
 
-Result of the last run: **18/18 passing**.
+Result of the last run: **28/28 passing**.
 
 ---
 
