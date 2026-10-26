@@ -18,7 +18,19 @@ exports.getMyChallans = async (req, res) => {
                         evidence: true
                     }
                 },
-                vehicle: true
+                vehicle: true,
+                // Lets the UI show the transaction that settled the challan.
+                payments: {
+                    select: {
+                        id: true,
+                        reference: true,
+                        method: true,
+                        status: true,
+                        amount: true,
+                        completedAt: true
+                    },
+                    orderBy: { createdAt: "desc" }
+                }
             },
             orderBy: {
                 createdAt: "desc"
@@ -57,7 +69,18 @@ exports.getChallanById = async (req, res) => {
                         owner: true
                     }
                 },
-                grievances: true
+                grievances: true,
+                payments: {
+                    select: {
+                        id: true,
+                        reference: true,
+                        method: true,
+                        status: true,
+                        amount: true,
+                        completedAt: true
+                    },
+                    orderBy: { createdAt: "desc" }
+                }
             }
         });
 
