@@ -186,10 +186,20 @@ exports.approveGrievance = async ({ grievanceId, officerId, officerNote }) => {
 };
 
 exports.rejectGrievance = async ({ grievanceId, officerId, officerNote }) => {
-    const g = await prisma.grievance.findUnique({ where: { id: grievanceId } });
-    if (!g) throw Object.assign(new Error('Grievance not found'), { code: 'NOT_FOUND' });
-    if (g.status !== 'UNDER_REVIEW') throw Object.assign(new Error('Invalid state transition'), { code: 'INVALID_STATE' });
+    return await prisma.$transaction(async (tx) => {
+        const g = await tx.grievance.findUnique({ where: { id: grievanceId }, include: { challan: true } });
+        if (!g) throw Object.assign(new Error('Grievance not found'), { code: 'NOT_FOUND' });
+        if (g.status !== 'UNDER_REVIEW') throw Object.assign(new Error('Invalid state transition'), { code: 'INVALID_STATE' });
 
-    const updated = await prisma.grievance.update({ where: { id: grievanceId }, data: { status: 'REJECTED', reviewedBy: officerId, reviewedAt: new Date(), officerNote } });
-    return updated;
+        const updated = await tx.grievance.update({ where: { id: grievanceId }, data: { status: 'REJECTED', reviewedBy: officerId, reviewedAt: new Date(), officerNote } });
+
+        // The challan was parked in DISPUTED when the grievance was filed. Rejection means the
+        // violation stands, so the citizen must be able to pay again: restore a payable status.
+        // Settled/cancelled challans are left untouched so this can never reopen a closed case.
+        if (g.challan && g.challan.status === 'DISPUTED' && !g.challan.paidAt) {
+            await tx.challan.update({ where: { id: g.challan.id }, data: { status: 'ISSUED' } });
+        }
+
+        return updated;
+    });
 };
